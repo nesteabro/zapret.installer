@@ -224,6 +224,65 @@ configure_zapret_list() {
     main_menu
 }
 
+ensure_zapret2_strategies() {
+    local repo_path="/opt/zapret/zapret2-strategies"
+    local repo_url="https://github.com/bol-van/zapret2"
+
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo -e "\e[35mПолучаю стратегии из bol-van/zapret2...\e[0m"
+        manage_service stop
+        git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии zapret2"
+        manage_service start
+        echo -e "\e[32mСтратегии zapret2 успешно получены.\e[0m"
+        return
+    fi
+
+    echo "Проверяю обновления стратегий bol-van/zapret2..."
+    manage_service stop
+    cd "$repo_path" && git fetch origin && git checkout -B master origin/master && git reset --hard origin/master || error_exit "не удалось обновить стратегии zapret2"
+    manage_service start
+}
+
+configure_zapret2_custom_strategy() {
+    local repo_path="/opt/zapret/zapret2-strategies"
+    local strategy_dir="$repo_path/init.d/custom.d.examples.linux"
+    local target_dir="/opt/zapret/init.d/custom.d"
+    local target_strategy="$target_dir/50-zapret2-installer-strategy"
+
+    ensure_zapret2_strategies
+
+    if [[ ! -d "$strategy_dir" ]]; then
+        error_exit "каталог со стратегиями zapret2 не найден: $strategy_dir"
+    fi
+
+    mkdir -p "$target_dir" || error_exit "не удалось создать каталог custom.d"
+
+    clear
+    echo -e "\e[36mВыберите стратегию из bol-van/zapret2 (custom.d examples):\e[0m"
+    PS3="Введите номер стратегии: "
+
+    select STRATEGY in $(for f in "$strategy_dir"/*; do echo "$(basename "$f")"; done) "Отключить стратегию zapret2" "Отмена"; do
+        if [[ "$STRATEGY" == "Отмена" ]]; then
+            main_menu
+        elif [[ "$STRATEGY" == "Отключить стратегию zapret2" ]]; then
+            rm -f "$target_strategy"
+            echo -e "\e[32mСтратегия zapret2 отключена.\e[0m"
+            manage_service restart
+            sleep 2
+            main_menu
+        elif [[ -n "$STRATEGY" ]]; then
+            cp "$strategy_dir/$STRATEGY" "$target_strategy" || error_exit "не удалось применить стратегию zapret2"
+            chmod +x "$target_strategy" || error_exit "не удалось выставить права на стратегию zapret2"
+            echo -e "\e[32mСтратегия '$STRATEGY' успешно применена.\e[0m"
+            manage_service restart
+            sleep 2
+            main_menu
+        else
+            echo -e "\e[31mНеверный выбор, попробуйте снова.\e[0m"
+        fi
+    done
+}
+
 configure_custom_conf_path() {
     echo -e "\e[36mУкажите путь к стратегии. (Enter и пустой ввод для отмены)\e[0m"
     read -rp "Путь к стратегии (Пример: /home/user/folder/123): " CONFIG_PATH
