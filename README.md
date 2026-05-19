@@ -7,7 +7,7 @@
 </div>
 
 Облегчает установку zapret для новичков и тех, кто не хочет разбираться в его работе.  
-Устанавливает [zapret из оффициального репозитория](https://github.com/bol-van/zapret), CLI панель управления и [репозиторий со стратегиями и списками доменов](https://github.com/Snowy-Fluffy/zapret.cfgs).  
+Устанавливает [zapret из официального репозитория](https://github.com/bol-van/zapret), CLI панель управления и [репозиторий со стратегиями и списками доменов](https://github.com/Snowy-Fluffy/zapret.cfgs).  
 Также в меню доступно применение стратегий из [bol-van/zapret2](https://github.com/bol-van/zapret2) (`init.d/custom.d.examples.linux`) с автоматическим обновлением и перезапуском сервиса.
 
 ### Установка  
@@ -53,4 +53,3 @@ zapret
 ### Скриншоты
 ![Основное меню](https://github.com/user-attachments/assets/1b08f280-e435-4f59-aa60-3749e0f25ba0)
 ![Подменю](https://github.com/user-attachments/assets/27c18e1a-2f6b-4aba-a7df-10f53993b365)
-

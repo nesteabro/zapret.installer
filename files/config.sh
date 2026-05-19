@@ -243,7 +243,7 @@ ensure_zapret2_strategies() {
     echo "Проверяю обновления стратегий bol-van/zapret2..."
     git -C "$repo_path" fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
     remote_branch=$(git -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
-    [[ -z "$remote_branch" ]] && remote_branch="master"
+    [[ -z "$remote_branch" ]] && remote_branch="main"
     git -C "$repo_path" reset --hard "origin/$remote_branch" || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
 }
 
