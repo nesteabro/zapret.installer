@@ -231,7 +231,7 @@ ensure_zapret2_strategies() {
     if [[ ! -d "$repo_path/.git" ]]; then
         echo -e "\e[35mПолучаю стратегии из bol-van/zapret2...\e[0m"
         manage_service stop
-        git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии zapret2"
+        git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии zapret2 (проверьте сеть, права на каталог и наличие git)"
         manage_service start
         echo -e "\e[32mСтратегии zapret2 успешно получены.\e[0m"
         return
@@ -239,7 +239,10 @@ ensure_zapret2_strategies() {
 
     echo "Проверяю обновления стратегий bol-van/zapret2..."
     manage_service stop
-    cd "$repo_path" && git fetch origin && git checkout -B master origin/master && git reset --hard origin/master || error_exit "не удалось обновить стратегии zapret2"
+    cd "$repo_path" || error_exit "не удалось перейти в каталог стратегий zapret2"
+    git fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
+    git checkout -B master origin/master || error_exit "не удалось переключить ветку стратегий zapret2 (git checkout)"
+    git reset --hard origin/master || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
     manage_service start
 }
 
@@ -257,11 +260,21 @@ configure_zapret2_custom_strategy() {
 
     mkdir -p "$target_dir" || error_exit "не удалось создать каталог custom.d"
 
+    local strategy_files=()
+    local strategy_file
+    for strategy_file in "$strategy_dir"/*; do
+        [[ -f "$strategy_file" ]] && strategy_files+=("$(basename "$strategy_file")")
+    done
+
+    if [[ ${#strategy_files[@]} -eq 0 ]]; then
+        error_exit "в zapret2 не найдено доступных custom.d стратегий"
+    fi
+
     clear
     echo -e "\e[36mВыберите стратегию из bol-van/zapret2 (custom.d examples):\e[0m"
     PS3="Введите номер стратегии: "
 
-    select STRATEGY in $(for f in "$strategy_dir"/*; do echo "$(basename "$f")"; done) "Отключить стратегию zapret2" "Отмена"; do
+    select STRATEGY in "${strategy_files[@]}" "Отключить стратегию zapret2" "Отмена"; do
         if [[ "$STRATEGY" == "Отмена" ]]; then
             main_menu
         elif [[ "$STRATEGY" == "Отключить стратегию zapret2" ]]; then
