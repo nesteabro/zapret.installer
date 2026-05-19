@@ -115,6 +115,7 @@ change_configuration() {
         echo -e "  \e[1;34m14)\e[0m Редактировать хостлист исключений (exclude) напрямую"
         echo -e "  \e[1;34m15)\e[0m Создать/Редактировать кастомный хостлист"
         echo -e "  \e[1;34m16)\e[0m Создать/Редактировать кастомную стратегию"
+        echo -e "  \e[1;34m17)\e[0m Применить стратегию из bol-van/zapret2 (custom.d examples)"
 
         echo ""
         echo -e "\e[1;96mСделано\e[0m by: \e[4;94mhttps://t.me/linux_hi\e[0m"
@@ -138,6 +139,7 @@ change_configuration() {
             14) open_editor /opt/zapret/ipset/zapret-hosts-user-exclude.txt ;;
             15) edit_cust_list;;
             16) edit_cust_conf;;
+            17) configure_zapret2_custom_strategy;;
             0) main_menu ;;
             *) echo -e "\e[1;31mНеверный ввод! Попробуйте снова.\e[0m"; sleep 2 ;;
         esac
