@@ -242,7 +242,7 @@ ensure_zapret2_strategies() {
 
     echo "Проверяю обновления стратегий bol-van/zapret2..."
     git -C "$repo_path" fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
-    remote_branch=$(git -C "$repo_path" remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p' | head -n 1)
+    remote_branch=$(git -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
     if [[ -z "$remote_branch" ]]; then
         if git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/main; then
             remote_branch="main"
@@ -252,7 +252,9 @@ ensure_zapret2_strategies() {
             error_exit "не удалось определить ветку стратегий zapret2: в origin не найдены ветки main и master"
         fi
     fi
-    git -C "$repo_path" checkout "$remote_branch" >/dev/null 2>&1 || git -C "$repo_path" checkout -B "$remote_branch" "origin/$remote_branch" || error_exit "не удалось переключить ветку стратегий zapret2 (git checkout)"
+    if ! git -C "$repo_path" checkout "$remote_branch" >/dev/null 2>&1; then
+        git -C "$repo_path" checkout -B "$remote_branch" "origin/$remote_branch" || error_exit "не удалось переключить ветку стратегий zapret2 (git checkout)"
+    fi
     git -C "$repo_path" pull --ff-only origin "$remote_branch" || error_exit "не удалось применить обновления стратегий zapret2 (git pull)"
 }
 
