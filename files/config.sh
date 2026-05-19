@@ -235,7 +235,7 @@ ensure_zapret2_strategies() {
 
     if [[ ! -d "$repo_path/.git" ]]; then
         echo -e "\e[35mПолучаю стратегии из bol-van/zapret2...\e[0m"
-        git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии zapret2 (проверьте сеть, права на каталог и наличие git)"
+        git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии zapret2 (проверьте сеть и права на каталог)"
         echo -e "\e[32mСтратегии zapret2 успешно получены.\e[0m"
         return
     fi
@@ -249,7 +249,7 @@ ensure_zapret2_strategies() {
         elif git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/master; then
             remote_branch="master"
         else
-            error_exit "не удалось определить ветку стратегий zapret2"
+            error_exit "не удалось определить ветку стратегий zapret2: в origin не найдены ветки main и master"
         fi
     fi
     git -C "$repo_path" checkout "$remote_branch" >/dev/null 2>&1 || git -C "$repo_path" checkout -B "$remote_branch" "origin/$remote_branch" || error_exit "не удалось переключить ветку стратегий zapret2 (git checkout)"
