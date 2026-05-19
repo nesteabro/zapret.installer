@@ -242,9 +242,18 @@ ensure_zapret2_strategies() {
 
     echo "Проверяю обновления стратегий bol-van/zapret2..."
     git -C "$repo_path" fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
-    remote_branch=$(git -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
-    [[ -z "$remote_branch" ]] && remote_branch="main"
-    git -C "$repo_path" reset --hard "origin/$remote_branch" || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
+    remote_branch=$(git -C "$repo_path" remote show origin 2>/dev/null | sed -n 's/.*HEAD branch: //p' | head -n 1)
+    if [[ -z "$remote_branch" ]]; then
+        if git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/main; then
+            remote_branch="main"
+        elif git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/master; then
+            remote_branch="master"
+        else
+            error_exit "не удалось определить ветку стратегий zapret2"
+        fi
+    fi
+    git -C "$repo_path" checkout "$remote_branch" >/dev/null 2>&1 || git -C "$repo_path" checkout -B "$remote_branch" "origin/$remote_branch" || error_exit "не удалось переключить ветку стратегий zapret2 (git checkout)"
+    git -C "$repo_path" pull --ff-only origin "$remote_branch" || error_exit "не удалось применить обновления стратегий zapret2 (git pull)"
 }
 
 configure_zapret2_custom_strategy() {
