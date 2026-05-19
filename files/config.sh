@@ -228,6 +228,10 @@ ensure_zapret2_strategies() {
     local repo_path="/opt/zapret/zapret2-strategies"
     local repo_url="https://github.com/bol-van/zapret2"
 
+    if ! command -v git >/dev/null 2>&1; then
+        error_exit "git не установлен. Установите git и попробуйте снова"
+    fi
+
     if [[ ! -d "$repo_path/.git" ]]; then
         echo -e "\e[35mПолучаю стратегии из bol-van/zapret2...\e[0m"
         manage_service stop
@@ -239,10 +243,8 @@ ensure_zapret2_strategies() {
 
     echo "Проверяю обновления стратегий bol-van/zapret2..."
     manage_service stop
-    cd "$repo_path" || error_exit "не удалось перейти в каталог стратегий zapret2"
-    git fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
-    git checkout -B master origin/master || error_exit "не удалось переключить ветку стратегий zapret2 (git checkout)"
-    git reset --hard origin/master || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
+    git -C "$repo_path" fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
+    git -C "$repo_path" reset --hard origin/master || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
     manage_service start
 }
 
