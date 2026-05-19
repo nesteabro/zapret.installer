@@ -227,6 +227,7 @@ configure_zapret_list() {
 ensure_zapret2_strategies() {
     local repo_path="/opt/zapret/zapret2-strategies"
     local repo_url="https://github.com/bol-van/zapret2"
+    local remote_branch
 
     if ! command -v git >/dev/null 2>&1; then
         error_exit "git не установлен. Установите git и попробуйте снова"
@@ -234,18 +235,16 @@ ensure_zapret2_strategies() {
 
     if [[ ! -d "$repo_path/.git" ]]; then
         echo -e "\e[35mПолучаю стратегии из bol-van/zapret2...\e[0m"
-        manage_service stop
         git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии zapret2 (проверьте сеть, права на каталог и наличие git)"
-        manage_service start
         echo -e "\e[32mСтратегии zapret2 успешно получены.\e[0m"
         return
     fi
 
     echo "Проверяю обновления стратегий bol-van/zapret2..."
-    manage_service stop
     git -C "$repo_path" fetch origin || error_exit "не удалось получить обновления стратегий zapret2 (git fetch)"
-    git -C "$repo_path" reset --hard origin/master || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
-    manage_service start
+    remote_branch=$(git -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
+    [[ -z "$remote_branch" ]] && remote_branch="master"
+    git -C "$repo_path" reset --hard "origin/$remote_branch" || error_exit "не удалось применить обновления стратегий zapret2 (git reset)"
 }
 
 configure_zapret2_custom_strategy() {
