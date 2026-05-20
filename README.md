@@ -9,6 +9,7 @@
 Облегчает установку zapret для новичков и тех, кто не хочет разбираться в его работе.  
 Устанавливает [zapret из официального репозитория](https://github.com/bol-van/zapret), CLI панель управления и [репозиторий со стратегиями и списками доменов](https://github.com/Snowy-Fluffy/zapret.cfgs).  
 Также в меню доступно применение стратегий из [bol-van/zapret2](https://github.com/bol-van/zapret2) (`init.d/custom.d.examples.linux`) с автоматическим обновлением и перезапуском сервиса.
+Также можно синхронизировать `general*.bat` стратегии из [FlowSeal/zapret-discord-youtube](https://github.com/FlowSeal/zapret-discord-youtube): они автоматически конвертируются в Linux-конфиги и добавляются в список стратегий.
 
 ### Установка  
 

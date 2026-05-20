@@ -308,6 +308,167 @@ configure_zapret2_custom_strategy() {
     done
 }
 
+ensure_flowseal_strategies_repo() {
+    local repo_path="/opt/zapret/flowseal-strategies"
+    local repo_url="https://github.com/Flowseal/zapret-discord-youtube"
+    local remote_branch
+
+    if ! command -v git >/dev/null 2>&1; then
+        error_exit "git не установлен. Установите git и попробуйте снова"
+    fi
+
+    if [[ ! -d "$repo_path/.git" ]]; then
+        echo -e "\e[35mПолучаю стратегии из FlowSeal/zapret-discord-youtube...\e[0m"
+        git clone "$repo_url" "$repo_path" || error_exit "не удалось получить стратегии FlowSeal (проверьте сеть и права на каталог)"
+        echo -e "\e[32mСтратегии FlowSeal успешно получены.\e[0m"
+        return
+    fi
+
+    echo "Проверяю обновления стратегий FlowSeal/zapret-discord-youtube..."
+    git -C "$repo_path" fetch origin || error_exit "не удалось получить обновления стратегий FlowSeal (git fetch)"
+    remote_branch=$(git -C "$repo_path" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@')
+    if [[ -z "$remote_branch" ]]; then
+        if git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/main; then
+            remote_branch="main"
+        elif git -C "$repo_path" show-ref --verify --quiet refs/remotes/origin/master; then
+            remote_branch="master"
+        else
+            error_exit "не удалось определить ветку стратегий FlowSeal: в origin не найдены ветки main и master"
+        fi
+    fi
+    if ! git -C "$repo_path" checkout "$remote_branch" >/dev/null 2>&1; then
+        git -C "$repo_path" checkout -B "$remote_branch" "origin/$remote_branch" || error_exit "не удалось переключить ветку стратегий FlowSeal (git checkout)"
+    fi
+    git -C "$repo_path" pull --ff-only origin "$remote_branch" || error_exit "не удалось применить обновления стратегий FlowSeal (git pull)"
+}
+
+convert_flowseal_bat_to_config() {
+    local source_bat="$1"
+    local target_config="$2"
+    local template_config="/opt/zapret/zapret.cfgs/configurations/general"
+    local tmp_cmd_file tmp_cfg_file tmp_opt_file
+    local full_cmd wf_tcp wf_udp nfqws_opt
+
+    if [[ ! -f "$template_config" ]]; then
+        error_exit "базовая стратегия не найдена: $template_config"
+    fi
+
+    tmp_cmd_file=$(mktemp)
+    tmp_cfg_file=$(mktemp)
+    tmp_opt_file=$(mktemp)
+
+    awk '
+        BEGIN { capture=0 }
+        {
+            gsub(/\r/, "", $0)
+            if (!capture && $0 ~ /winws\.exe"/) {
+                capture=1
+                sub(/^.*winws\.exe"[[:space:]]*/, "", $0)
+            }
+            if (capture) {
+                line=$0
+                sub(/[[:space:]]*\^[[:space:]]*$/, "", line)
+                gsub(/^[[:space:]]+/, "", line)
+                if (line != "") print line
+            }
+        }
+    ' "$source_bat" > "$tmp_cmd_file"
+
+    full_cmd=$(tr '\n' ' ' < "$tmp_cmd_file" | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')
+    if [[ -z "$full_cmd" ]]; then
+        rm -f "$tmp_cmd_file" "$tmp_cfg_file" "$tmp_opt_file"
+        error_exit "не удалось разобрать стратегию: $source_bat"
+    fi
+
+    full_cmd="${full_cmd//%GameFilterTCP%/1024-65535}"
+    full_cmd="${full_cmd//%GameFilterUDP%/1024-65535}"
+
+    wf_tcp=$(echo "$full_cmd" | sed -n 's/.*--wf-tcp=\([^ ]*\).*/\1/p' | head -n 1)
+    wf_udp=$(echo "$full_cmd" | sed -n 's/.*--wf-udp=\([^ ]*\).*/\1/p' | head -n 1)
+    [[ -z "$wf_tcp" ]] && wf_tcp="80,443"
+    [[ -z "$wf_udp" ]] && wf_udp="443,50000-65535"
+
+    nfqws_opt=$(echo "$full_cmd" | sed -E 's/^.*--wf-udp=[^ ]+[[:space:]]*//')
+    nfqws_opt=$(echo "$nfqws_opt" | sed \
+        -e 's|%BIN%|/opt/zapret/files/fake/|g' \
+        -e 's|%LISTS%list-general.txt|/opt/zapret/ipset/zapret-hosts-user.txt|g' \
+        -e 's|%LISTS%list-general-user.txt|/opt/zapret/ipset/zapret-hosts-user.txt|g' \
+        -e 's|%LISTS%list-google.txt|/opt/zapret/ipset/zapret-hosts-user.txt|g' \
+        -e 's|%LISTS%list-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
+        -e 's|%LISTS%list-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
+        -e 's|%LISTS%ipset-all.txt|/opt/zapret/ipset/ipset-game.txt|g' \
+        -e 's|%LISTS%ipset-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
+        -e 's|%LISTS%ipset-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g')
+    nfqws_opt=$(echo "$nfqws_opt" | sed -E 's/[[:space:]]+--ipset-exclude="[^"]*"//g; s/,+/,/g; s/=, /=/g; s/,,+/,/g')
+    nfqws_opt=$(echo "$nfqws_opt" | sed 's/[[:space:]]--new[[:space:]]/ --new ^\
+/g')
+
+    cp "$template_config" "$tmp_cfg_file" || error_exit "не удалось подготовить шаблон стратегии"
+    printf "%s\n" "$nfqws_opt" > "$tmp_opt_file"
+
+    awk -v tcp="$wf_tcp" -v udp="$wf_udp" -v opt_file="$tmp_opt_file" '
+        BEGIN {
+            in_opt=0
+            while ((getline line < opt_file) > 0) {
+                opt[++opt_count]=line
+            }
+            close(opt_file)
+        }
+        {
+            if ($0 ~ /^NFQWS_PORTS_TCP=/) {
+                print "NFQWS_PORTS_TCP=" tcp
+                next
+            }
+            if ($0 ~ /^NFQWS_PORTS_UDP=/) {
+                print "NFQWS_PORTS_UDP=" udp
+                next
+            }
+            if ($0 ~ /^NFQWS_OPT="/) {
+                print "NFQWS_OPT=\""
+                for (i=1; i<=opt_count; i++) print opt[i]
+                print "\""
+                in_opt=1
+                next
+            }
+            if (in_opt) {
+                if ($0 ~ /^"/) in_opt=0
+                next
+            }
+            print
+        }
+    ' "$tmp_cfg_file" > "$target_config" || error_exit "не удалось собрать Linux-стратегию из $source_bat"
+
+    rm -f "$tmp_cmd_file" "$tmp_cfg_file" "$tmp_opt_file"
+}
+
+sync_flowseal_strategies() {
+    local repo_path="/opt/zapret/flowseal-strategies"
+    local strategy_file strategy_name safe_name target_config
+    local strategy_count=0
+
+    ensure_flowseal_strategies_repo
+
+    if [[ ! -d /opt/zapret/zapret.cfgs/configurations ]]; then
+        error_exit "не найден каталог стратегий: /opt/zapret/zapret.cfgs/configurations"
+    fi
+
+    for strategy_file in "$repo_path"/general*.bat; do
+        [[ -f "$strategy_file" ]] || continue
+        strategy_name=$(basename "$strategy_file" .bat)
+        safe_name=$(echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g')
+        target_config="/opt/zapret/zapret.cfgs/configurations/FlowSeal_${safe_name}"
+        convert_flowseal_bat_to_config "$strategy_file" "$target_config"
+        strategy_count=$((strategy_count + 1))
+    done
+
+    if [[ $strategy_count -eq 0 ]]; then
+        error_exit "в FlowSeal не найдено стратегий general*.bat для синхронизации"
+    fi
+
+    echo -e "\e[32mСинхронизировано стратегий FlowSeal: $strategy_count\e[0m"
+    sleep 2
+}
+
 configure_custom_conf_path() {
     echo -e "\e[36mУкажите путь к стратегии. (Enter и пустой ввод для отмены)\e[0m"
     read -rp "Путь к стратегии (Пример: /home/user/folder/123): " CONFIG_PATH
