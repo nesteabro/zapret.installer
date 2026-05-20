@@ -400,8 +400,7 @@ convert_flowseal_bat_to_config() {
         -e 's|%LISTS%ipset-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
         -e 's|%LISTS%ipset-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g')
     nfqws_opt=$(echo "$nfqws_opt" | sed -E 's/[[:space:]]+--ipset-exclude="[^"]*"//g; s/,+/,/g; s/=, /=/g; s/,,+/,/g')
-    nfqws_opt=$(echo "$nfqws_opt" | sed 's/[[:space:]]--new[[:space:]]/ --new ^\
-/g')
+    nfqws_opt=$(echo "$nfqws_opt" | awk '{ gsub(/ --new /, " --new ^\n"); print }')
 
     cp "$template_config" "$tmp_cfg_file" || error_exit "не удалось подготовить шаблон стратегии"
     printf "%s\n" "$nfqws_opt" > "$tmp_opt_file"
@@ -455,7 +454,7 @@ sync_flowseal_strategies() {
     for strategy_file in "$repo_path"/general*.bat; do
         [[ -f "$strategy_file" ]] || continue
         strategy_name=$(basename "$strategy_file" .bat)
-        safe_name=$(echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g')
+        safe_name=$(echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g')
         target_config="/opt/zapret/zapret.cfgs/configurations/FlowSeal_${safe_name}"
         convert_flowseal_bat_to_config "$strategy_file" "$target_config"
         strategy_count=$((strategy_count + 1))
