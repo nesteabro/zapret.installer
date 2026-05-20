@@ -391,6 +391,8 @@ convert_flowseal_bat_to_config() {
     [[ -z "$wf_udp" ]] && wf_udp="443,50000-65535"
 
     nfqws_opt=$(echo "$full_cmd" | sed -E 's/^.*--wf-udp=[^ ]+[[:space:]]*//')
+    # Windows-списки объединяются в текущие Linux user-листы, чтобы стратегия работала
+    # в рамках стандартной схемы zapret.installer (один hostlist и один exclude list).
     nfqws_opt=$(echo "$nfqws_opt" | sed \
         -e 's|%BIN%|/opt/zapret/files/fake/|g' \
         -e 's|%LISTS%list-general.txt|/opt/zapret/ipset/zapret-hosts-user.txt|g' \
@@ -402,7 +404,7 @@ convert_flowseal_bat_to_config() {
         -e 's|%LISTS%ipset-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
         -e 's|%LISTS%ipset-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g')
     # Удаляем ipset-exclude (в linux-профиле используется единый exclude лист) и нормализуем запятые.
-    nfqws_opt=$(echo "$nfqws_opt" | sed -E "s/[[:space:]]+--ipset-exclude=(\"[^\"]*\"|'[^']*'|[^[:space:]]+)//g; s/,+/,/g; s/=, /=/g; s/,,+/,/g")
+    nfqws_opt=$(echo "$nfqws_opt" | sed -E "s/[[:space:]]+--ipset-exclude=(\"[^\"]*\"|'[^']*'|[^[:space:]]+)//g; s/,+/,/g; s/=, /=/g")
     nfqws_opt=$(echo "$nfqws_opt" | awk '{ gsub(/ --new /, " --new ^\n"); print }')
 
     cp "$template_config" "$tmp_cfg_file" || error_exit "не удалось подготовить шаблон стратегии"
@@ -446,7 +448,7 @@ convert_flowseal_bat_to_config() {
 sanitize_flowseal_strategy_name() {
     local strategy_name="$1"
     # Пробелы и спецсимволы заменяются на "_", повторы "_" схлопываются.
-    echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g; s/^_+//; s/_+$//'
+    echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g; s/\.+/./g; s/^[_.]+//; s/[_.]+$//'
 }
 
 sync_flowseal_strategies() {
