@@ -348,6 +348,7 @@ convert_flowseal_bat_to_config() {
     local template_config="/opt/zapret/zapret.cfgs/configurations/general"
     local tmp_cmd_file tmp_cfg_file tmp_opt_file
     local full_cmd wf_tcp wf_udp nfqws_opt
+    local game_filter_ports="1024-65535"
 
     if [[ ! -f "$template_config" ]]; then
         error_exit "базовая стратегия не найдена: $template_config"
@@ -380,8 +381,8 @@ convert_flowseal_bat_to_config() {
         error_exit "не удалось разобрать стратегию: $source_bat"
     fi
 
-    full_cmd="${full_cmd//%GameFilterTCP%/1024-65535}"
-    full_cmd="${full_cmd//%GameFilterUDP%/1024-65535}"
+    full_cmd="${full_cmd//%GameFilterTCP%/$game_filter_ports}"
+    full_cmd="${full_cmd//%GameFilterUDP%/$game_filter_ports}"
 
     wf_tcp=$(echo "$full_cmd" | sed -n 's/.*--wf-tcp=\([^ ]*\).*/\1/p' | head -n 1)
     wf_udp=$(echo "$full_cmd" | sed -n 's/.*--wf-udp=\([^ ]*\).*/\1/p' | head -n 1)
@@ -399,6 +400,7 @@ convert_flowseal_bat_to_config() {
         -e 's|%LISTS%ipset-all.txt|/opt/zapret/ipset/ipset-game.txt|g' \
         -e 's|%LISTS%ipset-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
         -e 's|%LISTS%ipset-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g')
+    # Удаляем ipset-exclude (в linux-профиле используется единый exclude лист) и нормализуем запятые.
     nfqws_opt=$(echo "$nfqws_opt" | sed -E 's/[[:space:]]+--ipset-exclude="[^"]*"//g; s/,+/,/g; s/=, /=/g; s/,,+/,/g')
     nfqws_opt=$(echo "$nfqws_opt" | awk '{ gsub(/ --new /, " --new ^\n"); print }')
 
@@ -440,6 +442,12 @@ convert_flowseal_bat_to_config() {
     rm -f "$tmp_cmd_file" "$tmp_cfg_file" "$tmp_opt_file"
 }
 
+sanitize_flowseal_strategy_name() {
+    local strategy_name="$1"
+    # Пробелы и спецсимволы заменяются на "_", повторы "_" схлопываются.
+    echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g'
+}
+
 sync_flowseal_strategies() {
     local repo_path="/opt/zapret/flowseal-strategies"
     local strategy_file strategy_name safe_name target_config
@@ -454,7 +462,7 @@ sync_flowseal_strategies() {
     for strategy_file in "$repo_path"/general*.bat; do
         [[ -f "$strategy_file" ]] || continue
         strategy_name=$(basename "$strategy_file" .bat)
-        safe_name=$(echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g')
+        safe_name=$(sanitize_flowseal_strategy_name "$strategy_name")
         target_config="/opt/zapret/zapret.cfgs/configurations/FlowSeal_${safe_name}"
         convert_flowseal_bat_to_config "$strategy_file" "$target_config"
         strategy_count=$((strategy_count + 1))
