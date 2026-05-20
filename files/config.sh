@@ -386,6 +386,7 @@ convert_flowseal_bat_to_config() {
 
     wf_tcp=$(echo "$full_cmd" | sed -n 's/.*--wf-tcp=\([^ ]*\).*/\1/p' | head -n 1)
     wf_udp=$(echo "$full_cmd" | sed -n 's/.*--wf-udp=\([^ ]*\).*/\1/p' | head -n 1)
+    # Значения по умолчанию, если в bat-стратегии отсутствуют --wf-* параметры.
     [[ -z "$wf_tcp" ]] && wf_tcp="80,443"
     [[ -z "$wf_udp" ]] && wf_udp="443,50000-65535"
 
@@ -401,7 +402,7 @@ convert_flowseal_bat_to_config() {
         -e 's|%LISTS%ipset-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
         -e 's|%LISTS%ipset-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g')
     # Удаляем ipset-exclude (в linux-профиле используется единый exclude лист) и нормализуем запятые.
-    nfqws_opt=$(echo "$nfqws_opt" | sed -E 's/[[:space:]]+--ipset-exclude="[^"]*"//g; s/,+/,/g; s/=, /=/g; s/,,+/,/g')
+    nfqws_opt=$(echo "$nfqws_opt" | sed -E "s/[[:space:]]+--ipset-exclude=(\"[^\"]*\"|'[^']*'|[^[:space:]]+)//g; s/,+/,/g; s/=, /=/g; s/,,+/,/g")
     nfqws_opt=$(echo "$nfqws_opt" | awk '{ gsub(/ --new /, " --new ^\n"); print }')
 
     cp "$template_config" "$tmp_cfg_file" || error_exit "не удалось подготовить шаблон стратегии"
@@ -445,7 +446,7 @@ convert_flowseal_bat_to_config() {
 sanitize_flowseal_strategy_name() {
     local strategy_name="$1"
     # Пробелы и спецсимволы заменяются на "_", повторы "_" схлопываются.
-    echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g'
+    echo "$strategy_name" | sed -E 's/[[:space:]]+/_/g; s/[^[:alnum:]_.-]/_/g; s/_+/_/g; s/^_+//; s/_+$//'
 }
 
 sync_flowseal_strategies() {
