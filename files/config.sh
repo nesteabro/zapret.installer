@@ -386,11 +386,16 @@ convert_flowseal_bat_to_config() {
 
     wf_tcp=$(echo "$full_cmd" | sed -n 's/.*--wf-tcp=\([^ ]*\).*/\1/p' | head -n 1)
     wf_udp=$(echo "$full_cmd" | sed -n 's/.*--wf-udp=\([^ ]*\).*/\1/p' | head -n 1)
-    # Значения по умолчанию, если в bat-стратегии отсутствуют --wf-* параметры.
+    # Значения по умолчанию, если в bat-стратегии отсутствуют --wf-* параметры:
+    # TCP: базовый web-трафик, UDP: QUIC + типичный high-port диапазон, как в обычных профилях zapret.
     [[ -z "$wf_tcp" ]] && wf_tcp="80,443"
     [[ -z "$wf_udp" ]] && wf_udp="443,50000-65535"
 
-    nfqws_opt=$(echo "$full_cmd" | sed -E 's/^.*--wf-udp=[^ ]+[[:space:]]*//')
+    if [[ "$full_cmd" == *"--wf-udp="* ]]; then
+        nfqws_opt=$(echo "$full_cmd" | sed -E 's/^.*--wf-udp=[^ ]+[[:space:]]*//')
+    else
+        nfqws_opt=$(echo "$full_cmd" | sed -E 's/^.*[[:space:]](--filter-(tcp|udp)=)/\1/; s/^[[:space:]]+//')
+    fi
     # Windows-списки объединяются в текущие Linux user-листы, чтобы стратегия работала
     # в рамках стандартной схемы zapret.installer (один hostlist и один exclude list).
     nfqws_opt=$(echo "$nfqws_opt" | sed \
@@ -403,7 +408,8 @@ convert_flowseal_bat_to_config() {
         -e 's|%LISTS%ipset-all.txt|/opt/zapret/ipset/ipset-game.txt|g' \
         -e 's|%LISTS%ipset-exclude.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g' \
         -e 's|%LISTS%ipset-exclude-user.txt|/opt/zapret/ipset/zapret-hosts-user-exclude.txt|g')
-    # Удаляем ipset-exclude (в linux-профиле используется единый exclude лист) и нормализуем запятые.
+    # Удаляем ipset-exclude (в linux-профиле используется единый exclude лист), затем нормализуем запятые
+    # и убираем артефакты вида "=, ".
     nfqws_opt=$(echo "$nfqws_opt" | sed -E "s/[[:space:]]+--ipset-exclude=(\"[^\"]*\"|'[^']*'|[^[:space:]]+)//g; s/,+/,/g; s/=, /=/g")
     nfqws_opt=$(echo "$nfqws_opt" | awk '{ gsub(/ --new /, " --new ^\n"); print }')
 
